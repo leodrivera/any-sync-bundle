@@ -1,0 +1,77 @@
+# Add-on: headless Anytype client with HTTP API (for MCP / automations)
+#
+# Stack this on top of any bundle compose file:
+#
+#   compose.aio.yml (default data path):
+#     docker compose -f compose.aio.yml -f compose.anytype-cli.yml up -d
+#
+#   compose.external.yml / compose.s3.yml (bundle data at ./data/bundle):
+#     ANYTYPE_BUNDLE_DATA=./data/bundle \
+#       docker compose -f compose.external.yml -f compose.anytype-cli.yml up -d
+#
+#   compose.traefik.yml (default data path):
+#     docker compose -f compose.traefik.yml -f compose.anytype-cli.yml up -d
+#
+# One-time account setup (run before first `up -d`):
+#   docker compose -f <base>.yml -f compose.anytype-cli.yml \
+#     run --rm anytype-heart \
+#     anytype auth create my-bot \
+#     --network-config /root/.config/anytype/network.yml
+#
+# Generate an API key for MCP (run after account setup):
+#   docker compose -f <base>.yml -f compose.anytype-cli.yml \
+#     run --rm anytype-heart \
+#     anytype auth apikey create my-mcp-key
+#
+# MCP configuration (Claude Desktop, Cursor, etc.):
+#   {
+#     "mcpServers": {
+#       "anytype": {
+#         "command": "npx",
+#         "args": ["-y", "@anyproto/anytype-mcp"],
+#         "env": {
+#           "ANYTYPE_API_BASE_URL": "http://localhost:31012",
+#           "OPENAPI_MCP_HEADERS": "{\"Authorization\":\"Bearer <YOUR_API_KEY>\", \"Anytype-Version\":\"2025-11-08\"}"
+#         }
+#       }
+#     }
+#   }
+
+services:
+  anytype-heart:
+    image: docker.io/anyproto/anytype-cli:latest
+    container_name: any-sync-bundle-anytype-heart
+    restart: unless-stopped
+    depends_on:
+      - any-sync-bundle
+    ports:
+      # Binds to all interfaces (0.0.0.0). For VPS/public servers, consider
+      # changing to "127.0.0.1:31012:31012" to restrict to localhost only.
+      - "31012:31012"
+    environment:
+      # Store anytype data under a separate path so it can be persisted independently.
+      DATA_PATH: /data/anytype
+    volumes:
+      # Persists account config and keys across restarts
+      - ./data/anytype-heart/config:/root/.anytype
+      # Persists anytype object data across restarts
+      - ./data/anytype-heart/data:/data/anytype
+      # Injects bundle network config as anytype-cli network config.
+      # Default path matches compose.aio.yml and compose.traefik.yml.
+      # Set ANYTYPE_BUNDLE_DATA=./data/bundle for compose.external.yml / compose.s3.yml.
+      - ${ANYTYPE_BUNDLE_DATA:-./data}/client-config.yml:/root/.config/anytype/network.yml:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      if [ ! -f /root/.anytype/config.json ]; then
+        echo ""
+        echo "=== anytype-heart: no account configured ==="
+        echo ""
+        echo "Run this once to create a bot account:"
+        echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth create my-bot --network-config /root/.config/anytype/network.yml"
+        echo ""
+        echo "Then generate an API key:"
+        echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth apikey create my-mcp-key"
+        echo ""
+        exit 1
+      fi
+      anytype serve --listen-address 0.0.0.0:31012
