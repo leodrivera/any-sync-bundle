@@ -5,9 +5,12 @@
 #   compose.aio.yml (default data path):
 #     docker compose -f compose.aio.yml -f compose.anytype-cli.yml up -d
 #
-#   compose.external.yml / compose.s3.yml (bundle data at ./data/bundle):
+#   compose.external.yml (bundle data at ./data/bundle):
 #     ANYTYPE_BUNDLE_DATA=./data/bundle \
 #       docker compose -f compose.external.yml -f compose.anytype-cli.yml up -d
+#
+#   compose.s3.yml (default data path):
+#     docker compose -f compose.s3.yml -f compose.anytype-cli.yml up -d
 #
 #   compose.traefik.yml (default data path):
 #     docker compose -f compose.traefik.yml -f compose.anytype-cli.yml up -d
@@ -58,7 +61,7 @@ services:
       - ./data/anytype-heart/data:/data/anytype
       # Injects bundle network config as anytype-cli network config.
       # Default path matches compose.aio.yml and compose.traefik.yml.
-      # Set ANYTYPE_BUNDLE_DATA=./data/bundle for compose.external.yml / compose.s3.yml.
+      # Set ANYTYPE_BUNDLE_DATA=./data/bundle for compose.external.yml.
       - ${ANYTYPE_BUNDLE_DATA:-./data}/client-config.yml:/root/.config/anytype/network.yml:ro
     entrypoint: ["/bin/sh", "-c"]
     command:

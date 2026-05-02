@@ -93,12 +93,13 @@ Latest tags (`:latest`, `:minimal`) are available, but explicit version tags are
 
 ### Docker Compose (Recommended)
 
-| File                   | Description                                  |
-| ---------------------- | -------------------------------------------- |
-| `compose.aio.yml`      | All-in-one with embedded MongoDB/Redis       |
-| `compose.external.yml` | Bundle + external MongoDB + Redis containers |
-| `compose.s3.yml`       | Bundle + MinIO for S3 storage                |
-| `compose.traefik.yml`  | With Traefik reverse proxy                   |
+| File                      | Description                                            |
+| ------------------------- | ------------------------------------------------------ |
+| `compose.aio.yml`         | All-in-one with embedded MongoDB/Redis                 |
+| `compose.external.yml`    | Bundle + external MongoDB + Redis containers           |
+| `compose.s3.yml`          | Bundle + MinIO for S3 storage                          |
+| `compose.traefik.yml`     | With Traefik reverse proxy                             |
+| `compose.anytype-cli.yml` | Add-on: headless Anytype client (API / MCP automation) |
 
 ```sh
 # Pick one as example:
@@ -120,6 +121,66 @@ Edit `ANY_SYNC_BUNDLE_INIT_EXTERNAL_ADDRS` in the compose file before starting.
   --initial-mongo-uri "mongodb://127.0.0.1:27017/" \
   --initial-redis-uri "redis://127.0.0.1:6379/" \
   --initial-storage ./data/storage
+```
+
+## API & MCP
+
+Run a headless Anytype client (`anytype-heart`) alongside the bundle to expose a persistent HTTP API on port `31012`. This lets you connect AI assistants via [anytype-mcp](https://github.com/anyproto/anytype-mcp) or build automations without keeping the desktop app open.
+
+### Setup
+
+Stack `compose.anytype-cli.yml` on top of your existing bundle compose file:
+
+| Base compose file         | Command                                                                                                                           |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `compose.aio.yml`         | `docker compose -f compose.aio.yml -f compose.anytype-cli.yml up -d`                                                             |
+| `compose.external.yml`    | `ANYTYPE_BUNDLE_DATA=./data/bundle docker compose -f compose.external.yml -f compose.anytype-cli.yml up -d`                      |
+| `compose.s3.yml`          | `docker compose -f compose.s3.yml -f compose.anytype-cli.yml up -d`                                                              |
+| `compose.traefik.yml`     | `docker compose -f compose.traefik.yml -f compose.anytype-cli.yml up -d`                                                         |
+
+### One-time account setup
+
+Run once before the first `up -d` (replace `<base>` with your compose file, e.g. `compose.aio.yml`):
+
+```sh
+# 1. Create a bot account — save the printed account key
+docker compose -f <base>.yml -f compose.anytype-cli.yml \
+  run --rm anytype-heart \
+  anytype auth create my-bot \
+  --network-config /root/.config/anytype/network.yml
+
+# 2. Generate an API key for MCP — save the printed key
+docker compose -f <base>.yml -f compose.anytype-cli.yml \
+  run --rm anytype-heart \
+  anytype auth apikey create my-mcp-key
+```
+
+### MCP configuration
+
+Add to your MCP client config (Claude Desktop, Cursor, Windsurf, etc.) after replacing `<YOUR_API_KEY>`:
+
+```json
+{
+  "mcpServers": {
+    "anytype": {
+      "command": "npx",
+      "args": ["-y", "@anyproto/anytype-mcp"],
+      "env": {
+        "ANYTYPE_API_BASE_URL": "http://localhost:31012",
+        "OPENAPI_MCP_HEADERS": "{\"Authorization\":\"Bearer <YOUR_API_KEY>\", \"Anytype-Version\":\"2025-11-08\"}"
+      }
+    }
+  }
+}
+```
+
+For Claude Code CLI:
+
+```sh
+claude mcp add anytype \
+  -e ANYTYPE_API_BASE_URL='http://localhost:31012' \
+  -e OPENAPI_MCP_HEADERS='{"Authorization":"Bearer <YOUR_API_KEY>", "Anytype-Version":"2025-11-08"}' \
+  -s user -- npx -y @anyproto/anytype-mcp
 ```
 
 ## Configuration
