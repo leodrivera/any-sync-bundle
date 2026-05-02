@@ -61,17 +61,18 @@ services:
       # Set ANYTYPE_BUNDLE_DATA=./data/bundle for compose.external.yml / compose.s3.yml.
       - ${ANYTYPE_BUNDLE_DATA:-./data}/client-config.yml:/root/.config/anytype/network.yml:ro
     entrypoint: ["/bin/sh", "-c"]
-    command: |
-      if [ ! -f /root/.anytype/config.json ]; then
-        echo ""
-        echo "=== anytype-heart: no account configured ==="
-        echo ""
-        echo "Run this once to create a bot account:"
-        echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth create my-bot --network-config /root/.config/anytype/network.yml"
-        echo ""
-        echo "Then generate an API key:"
-        echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth apikey create my-mcp-key"
-        echo ""
-        exit 1
-      fi
-      anytype serve --listen-address 0.0.0.0:31012
+    command:
+      - |
+        if [ ! -f /root/.anytype/config.json ]; then
+          echo ""
+          echo "=== anytype-heart: no account configured ==="
+          echo ""
+          echo "Run this once to create a bot account:"
+          echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth create my-bot --network-config /root/.config/anytype/network.yml"
+          echo ""
+          echo "Then generate an API key:"
+          echo "  docker compose -f <base>.yml -f compose.anytype-cli.yml run --rm anytype-heart anytype auth apikey create my-mcp-key"
+          echo ""
+          exit 1
+        fi
+        anytype serve --listen-address 0.0.0.0:31012
